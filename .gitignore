@@ -33,3 +33,4 @@ apiserver.local.config
 tmp/
 kubesphere.yaml
 testbin/
+kubeconfig.yaml

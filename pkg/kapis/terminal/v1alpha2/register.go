@@ -22,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"kubesphere.io/kubesphere/pkg/api"
+	"net/http"
 
 	"kubesphere.io/kubesphere/pkg/apiserver/authorization/authorizer"
 
@@ -58,6 +60,52 @@ func AddToContainer(c *restful.Container, client kubernetes.Interface, authorize
 		Doc("create shell access to node session").
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.TerminalTag}).
 		Writes(models.PodInfo{}))
+
+	//webservice.Route(webservice.POST("/namespaces/{namespace}/pods/{pod}/file").
+	//	To(handler.UploadFile).
+	//	Doc("Upload files to pod").
+	//	Consumes(runtime.MimeMultipartFormData).
+	//	Metadata(restfulspec.KeyOpenAPITags, []string{api.TagTerminal}).
+	//	Operation("upload-file-to-pod").
+	//	Param(webservice.PathParameter("namespace", "The specified namespace.")).
+	//	Param(webservice.PathParameter("pod", "pod name")).
+	//	Param(webservice.QueryParameter("container", "container name")).
+	//	Param(webservice.QueryParameter("path", "dest dir path")).
+	//	Returns(http.StatusOK, api.StatusOK, nil))
+
+	webservice.Route(webservice.GET("/namespaces/{namespace}/pods/{pod}/dir").
+		To(handler.List).
+		Doc("Get list dir or file from pod").
+		Operation("get-list-dir-or-file-from-pod").
+		Param(webservice.PathParameter("namespace", "The specified namespace.")).
+		Param(webservice.PathParameter("pod", "pod name")).
+		Param(webservice.QueryParameter("container", "container name")).
+		Param(webservice.QueryParameter("path", "dir path")).
+		Returns(http.StatusOK, api.StatusOK, nil))
+
+	webservice.Route(webservice.POST("/namespaces/{namespace}/pods/{pod}/file").
+		To(handler.UploadFile).
+		Doc("Upload files to pod").
+		Consumes(runtime.MimeMultipartFormData).
+		Metadata(restfulspec.KeyOpenAPITags, []string{api.TagTerminal}).
+		Operation("upload-file-to-pod").
+		Param(webservice.PathParameter("namespace", "The specified namespace.")).
+		Param(webservice.PathParameter("pod", "pod name")).
+		Param(webservice.QueryParameter("container", "container name")).
+		Param(webservice.QueryParameter("path", "dest dir path")).
+		Returns(http.StatusOK, api.StatusOK, nil))
+
+	webservice.Route(webservice.GET("/namespaces/{namespace}/pods/{pod}/file").
+		To(handler.DownloadFile).
+		Doc("Download file from pod").
+		Consumes(runtime.MimeMultipartFormData).
+		Metadata(restfulspec.KeyOpenAPITags, []string{api.TagTerminal}).
+		Operation("download-file-from-pod").
+		Param(webservice.PathParameter("namespace", "The specified namespace.")).
+		Param(webservice.PathParameter("pod", "pod name")).
+		Param(webservice.QueryParameter("container", "container name")).
+		Param(webservice.QueryParameter("path", "file path")).
+		Returns(http.StatusOK, api.StatusOK, nil))
 
 	c.Add(webservice)
 

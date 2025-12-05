@@ -1,0 +1,9 @@
+mirrors:
+    docker.io:
+        endpoint:
+            - https://oci-hub.cqcyit.com:20305
+            - https://swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io
+            - https://docker.1ms.run
+configs:
+    docker.io:
+        insecure: false

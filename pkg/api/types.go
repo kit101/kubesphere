@@ -175,4 +175,6 @@ const (
 
 	WorkspaceNone = ""
 	ClusterNone   = ""
+
+	TagTerminal = "Web Terminal"
 )
