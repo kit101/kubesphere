@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
+	batchv1 "k8s.io/api/batch/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 
@@ -29,12 +30,14 @@ import (
 )
 
 type operationHandler struct {
-	jobRunner workloads.JobRunner
+	jobRunner     workloads.JobRunner
+	cronjobRunner workloads.CronjobRunner
 }
 
 func newOperationHandler(client kubernetes.Interface) *operationHandler {
 	return &operationHandler{
-		jobRunner: workloads.NewJobRunner(client),
+		jobRunner:     workloads.NewJobRunner(client),
+		cronjobRunner: workloads.NewCronJobRunner(client),
 	}
 }
 
@@ -63,4 +66,37 @@ func (r *operationHandler) handleJobReRun(request *restful.Request, response *re
 	}
 
 	response.WriteAsJson(errors.None)
+}
+
+// handleCronjobImmediateExecute immediate execute a cronjob
+func (r *operationHandler) handleCronjobImmediateExecute(request *restful.Request, response *restful.Response) {
+	var err error
+	var createdJob *batchv1.Job
+
+	namespace := request.PathParameter("namespace")
+	cronjobName := request.PathParameter("cronjob")
+	action := request.QueryParameter("action")
+	resourceVersion := request.QueryParameter("resourceVersion")
+
+	switch action {
+	case "immediate-execute":
+		createdJob, err = r.cronjobRunner.CronjobImmediateExecute(namespace, cronjobName, resourceVersion)
+	default:
+		response.WriteHeaderAndEntity(http.StatusBadRequest, errors.Wrap(fmt.Errorf("invalid operation %s", action)))
+		return
+	}
+	if err != nil {
+		if k8serr.IsConflict(err) {
+			response.WriteHeaderAndEntity(http.StatusConflict, errors.Wrap(err))
+			return
+		}
+		if k8serr.IsNotFound(err) {
+			response.WriteHeaderAndEntity(http.StatusConflict, errors.Wrap(fmt.Errorf("cronjob %s not found in namespace %s", cronjobName, namespace)))
+			return
+		}
+		response.WriteHeaderAndEntity(http.StatusInternalServerError, errors.Wrap(err))
+		return
+	}
+	// 返回成功响应
+	response.WriteHeaderAndJson(http.StatusOK, createdJob, restful.MIME_JSON)
 }

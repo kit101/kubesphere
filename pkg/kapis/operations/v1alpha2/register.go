@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 
+	batchv1 "k8s.io/api/batch/v1"
 	"kubesphere.io/kubesphere/pkg/api"
 	"kubesphere.io/kubesphere/pkg/apiserver/runtime"
 	"kubesphere.io/kubesphere/pkg/server/errors"
@@ -49,6 +50,15 @@ func AddToContainer(c *restful.Container, client kubernetes.Interface) error {
 		Param(webservice.QueryParameter("action", "action must be \"rerun\"")).
 		Param(webservice.QueryParameter("resourceVersion", "version of job, rerun when the version matches").Required(true)).
 		Returns(http.StatusOK, api.StatusOK, errors.Error{}))
+
+	webservice.Route(webservice.POST("/namespaces/{namespace}/cronjobs/{cronjob}").
+		To(handler.handleCronjobImmediateExecute).
+		Doc("Immediate execute a cronjob.").
+		Param(webservice.PathParameter("namespace", "Namespace of the cronjob.").Required(true)).
+		Param(webservice.PathParameter("cronjob", "Name of the cronjob.").Required(true)).
+		Param(webservice.PathParameter("action", "action must be \"immediate-execute\"")).
+		Param(webservice.QueryParameter("resourceVersion", "version of job, rerun when the version matches").Required(true)).
+		Returns(http.StatusOK, api.StatusOK, batchv1.Job{}))
 
 	c.Add(webservice)
 

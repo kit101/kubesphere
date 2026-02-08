@@ -19,10 +19,8 @@ package v1alpha3
 import (
 	restfulspec "github.com/emicklei/go-restful-openapi/v2"
 	"github.com/emicklei/go-restful/v3"
-	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	"kubesphere.io/kubesphere/pkg/api"
@@ -54,15 +52,10 @@ func Resource(resource string) schema.GroupResource {
 	return GroupVersion.WithResource(resource).GroupResource()
 }
 
-func AddToContainer(c *restful.Container, informerFactory informers.InformerFactory, cache cache.Cache, client kubernetes.Interface) error {
+func AddToContainer(c *restful.Container, informerFactory informers.InformerFactory, cache cache.Cache) error {
 
 	webservice := runtime.NewWebService(GroupVersion)
-	handler := New(
-		resourcev1alpha3.NewResourceGetter(informerFactory, cache),
-		resourcev1alpha2.NewResourceGetter(informerFactory),
-		components.NewComponentsGetter(informerFactory.KubernetesSharedInformerFactory()),
-		client,
-	)
+	handler := New(resourcev1alpha3.NewResourceGetter(informerFactory, cache), resourcev1alpha2.NewResourceGetter(informerFactory), components.NewComponentsGetter(informerFactory.KubernetesSharedInformerFactory()))
 
 	webservice.Route(webservice.GET("/{resources}").
 		To(handler.handleListResources).
@@ -153,14 +146,6 @@ func AddToContainer(c *restful.Container, informerFactory informers.InformerFact
 		Param(webservice.QueryParameter(query.ParameterAscending, "sort parameters, e.g. reverse=true").Required(false).DefaultValue("ascending=false")).
 		Doc("List repository tags, this is an experimental API, use it by your own caution.").
 		Returns(http.StatusOK, ok, v2.RepositoryTags{}))
-
-	webservice.Route(webservice.POST("/namespaces/{namespace}/cronjobs/{cronjob}/immediate-execute").
-		To(handler.handleImmediateExecute).
-		Metadata(restfulspec.KeyOpenAPITags, []string{tagNamespacedResource}).
-		Doc("Manually execute a cronjob.").
-		Param(webservice.PathParameter("namespace", "Namespace of the cronjob.").Required(true)).
-		Param(webservice.PathParameter("cronjob", "Name of the cronjob.").Required(true)).
-		Returns(http.StatusOK, ok, batchv1.Job{}))
 
 	c.Add(webservice)
 
