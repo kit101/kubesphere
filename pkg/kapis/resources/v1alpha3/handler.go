@@ -18,17 +18,13 @@ package v1alpha3
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"net/http"
 	"sort"
 	"strings"
 
 	"github.com/emicklei/go-restful/v3"
-	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	"kubesphere.io/kubesphere/pkg/api"
@@ -46,19 +42,14 @@ type Handler struct {
 	resourcesGetterV1alpha2 *resourcev1alpha2.ResourceGetter
 	componentsGetter        components.ComponentsGetter
 	registryHelper          v2.RegistryHelper
-	client                  kubernetes.Interface
 }
 
-func New(resourceGetterV1alpha3 *resourcev1alpha3.ResourceGetter,
-	resourcesGetterV1alpha2 *resourcev1alpha2.ResourceGetter,
-	componentsGetter components.ComponentsGetter,
-	client kubernetes.Interface) *Handler {
+func New(resourceGetterV1alpha3 *resourcev1alpha3.ResourceGetter, resourcesGetterV1alpha2 *resourcev1alpha2.ResourceGetter, componentsGetter components.ComponentsGetter) *Handler {
 	return &Handler{
 		resourceGetterV1alpha3:  resourceGetterV1alpha3,
 		resourcesGetterV1alpha2: resourcesGetterV1alpha2,
 		componentsGetter:        componentsGetter,
 		registryHelper:          v2.NewRegistryHelper(),
-		client:                  client,
 	}
 }
 
@@ -292,52 +283,6 @@ func (h *Handler) handleGetRepositoryTags(request *restful.Request, response *re
 	tags.Tags = tags.Tags[startIndex:endIndex]
 
 	response.WriteHeaderAndJson(http.StatusOK, tags, restful.MIME_JSON)
-}
-
-// handleManualExecCronJob immediate execute a cronjob
-func (h *Handler) handleImmediateExecute(request *restful.Request, response *restful.Response) {
-	namespace := request.PathParameter("namespace")
-	cronjobName := request.PathParameter("cronjob")
-	// 获取 CronJob 对象
-	cronjob, err := h.client.BatchV1().CronJobs(namespace).Get(request.Request.Context(), cronjobName, metav1.GetOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			api.HandleNotFound(response, request, fmt.Errorf("cronjob %s not found in namespace %s", cronjobName, namespace))
-			return
-		}
-		klog.Errorf("Failed to get cronjob %s/%s: %v", namespace, cronjobName, err)
-		api.HandleInternalError(response, request, err)
-		return
-	}
-	// 基于 CronJob 创建 Job
-	jobName := cronjobName + "-immediate-execution-" + rand.String(6)
-	labels := cronjob.GetObjectMeta().GetLabels()
-	labels["created-by"] = "immediate-execution"
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: namespace,
-			Labels:    labels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "batch/v1",
-					Kind:       "CronJob",
-					Name:       cronjob.Name,
-					UID:        cronjob.UID,
-				},
-			},
-		},
-		Spec: *cronjob.Spec.JobTemplate.Spec.DeepCopy(),
-	}
-	// 创建 Job
-	createdJob, err := h.client.BatchV1().Jobs(namespace).Create(request.Request.Context(), job, metav1.CreateOptions{})
-	if err != nil {
-		klog.Errorf("Failed to create job from cronjob %s/%s: %v", namespace, cronjobName, err)
-		api.HandleInternalError(response, request, err)
-		return
-	}
-	// 返回成功响应
-	response.WriteHeaderAndJson(http.StatusOK, createdJob, restful.MIME_JSON)
 }
 
 func canonicalizeRegistryError(request *restful.Request, response *restful.Response, err error) {
